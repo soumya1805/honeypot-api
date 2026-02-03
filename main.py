@@ -12,12 +12,14 @@ def home():
 
 @app.post("/honeypot")
 async def honeypot(
-    payload: Optional[Dict[str, Any]] = Body(default=None),
+    payload: Optional[Any] = Body(default=None),   # ✅ accept ANY kind of body
     x_api_key: Optional[str] = Header(None)
 ):
+    # ✅ API key check
     if x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
+    # ✅ if body empty, keep safe
     if payload is None:
         payload = {}
 
