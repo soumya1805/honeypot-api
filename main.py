@@ -181,197 +181,471 @@
 #         "extracted_intelligence": conv["intel"]
 #     }
 
+
+# import os
+# import re
+# from fastapi import FastAPI, Header, HTTPException, Body
+# from typing import Any, Dict, Optional, List
+
+# app = FastAPI()
+# API_KEY = os.getenv("API_KEY", "gunnu123")
+
+# # -----------------------------
+# # MEMORY (per conversation)
+# # -----------------------------
+# MEMORY: Dict[str, Dict[str, Any]] = {}
+
+# # -----------------------------
+# # REGEX EXTRACTORS (strong)
+# # -----------------------------
+# UPI_REGEX = r"\b[a-zA-Z0-9.\-_]{2,}@[a-zA-Z]{2,}\b"
+# BANK_REGEX = r"\b\d{9,18}\b"
+# IFSC_REGEX = r"\b[A-Z]{4}0[A-Z0-9]{6}\b"
+# URL_REGEX = r"(https?://[^\s]+|www\.[^\s]+)"
+# PHONE_REGEX = r"\b[6-9]\d{9}\b"
+# EMAIL_REGEX = r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b"
+
+# SCAM_KEYWORDS = [
+#     "urgent", "account", "blocked", "otp", "kyc", "verify",
+#     "click", "link", "password", "reward", "won", "lottery",
+#     "upi", "refund", "offer", "compromised", "sbi", "bank"
+# ]
+
+# def normalize_list(items: List[str]) -> List[str]:
+#     return sorted(list(set([i.strip() for i in items if i and i.strip()])))
+
+# def detect_scam(message: str) -> float:
+#     """Return scam score 0 to 1"""
+#     msg = (message or "").lower()
+#     hits = sum(1 for k in SCAM_KEYWORDS if k in msg)
+#     score = min(1.0, hits / 3)  # 3 hits = 1.0
+#     return score
+
+# def extract_all(text: str) -> Dict[str, List[str]]:
+#     return {
+#         "upi_ids": normalize_list(re.findall(UPI_REGEX, text)),
+#         "bank_accounts": normalize_list(re.findall(BANK_REGEX, text)),
+#         "ifsc_codes": normalize_list(re.findall(IFSC_REGEX, text)),
+#         "phishing_links": normalize_list(re.findall(URL_REGEX, text)),
+#         "phone_numbers": normalize_list(re.findall(PHONE_REGEX, text)),
+#         "emails": normalize_list(re.findall(EMAIL_REGEX, text)),
+#     }
+
+# def get_goal(intel: Dict[str, List[str]]) -> str:
+#     """Decide next best target based on missing intelligence."""
+#     if len(intel["phishing_links"]) == 0:
+#         return "GET_LINK"
+#     if len(intel["upi_ids"]) == 0:
+#         return "GET_UPI"
+#     if len(intel["bank_accounts"]) == 0:
+#         return "GET_BANK"
+#     if len(intel["ifsc_codes"]) == 0:
+#         return "GET_IFSC"
+#     if len(intel["phone_numbers"]) == 0:
+#         return "GET_PHONE"
+#     return "STALL_MORE"
+
+# def agent_reply(goal: str, turns: int) -> str:
+#     """High-engagement believable replies based on goal."""
+#     if goal == "GET_LINK":
+#         return (
+#             "Oh no 😥 my SBI account will be blocked?? I’m really scared. "
+#             "I tried opening it but it’s not loading on my phone 😭 "
+#             "Can you send the official link again? (full link please)"
+#         )
+
+#     if goal == "GET_UPI":
+#         return (
+#             "Okay I got the page now… it is asking for verification/payment 😟 "
+#             "I will do it fast. Can you send your UPI ID once? "
+#             "I’ll copy paste carefully."
+#         )
+
+#     if goal == "GET_BANK":
+#         return (
+#             "UPI is failing again 😭 maybe due to limit. "
+#             "Can you share bank account number + beneficiary name? "
+#             "I’ll try bank transfer quickly."
+#         )
+
+#     if goal == "GET_IFSC":
+#         return (
+#             "I entered account number, now it’s asking IFSC code. "
+#             "Please send IFSC also 🙏"
+#         )
+
+#     if goal == "GET_PHONE":
+#         return (
+#             "The link is asking customer care contact. "
+#             "Can you share your support number? I’ll call once to confirm 😥"
+#         )
+
+#     if turns % 2 == 0:
+#         return (
+#             "Wait wait 😭 the page is stuck again… "
+#             "Just confirm this is 100% safe right? "
+#             "Send the details once again, I’ll try from my mom’s phone now."
+#         )
+#     else:
+#         return (
+#             "Sorry sorry 🙏 my network is slow. "
+#             "Please resend the link/UPI details clearly. I don’t want mistake."
+#         )
+
+# @app.get("/")
+# def home():
+#     return {"message": "Agentic Honeypot API is live ✅"}
+
+# @app.post("/honeypot")
+# async def honeypot(
+#     payload: Optional[Any] = Body(default=None),
+#     x_api_key: Optional[str] = Header(None)
+# ):
+#     if x_api_key != API_KEY:
+#         raise HTTPException(status_code=401, detail="Invalid API key")
+
+#     if payload is None:
+#         payload = {}
+
+#     # parse safely
+#     message = ""
+#     conversation_id = "default"
+
+#     if isinstance(payload, dict):
+#         message = str(payload.get("message", ""))
+#         conversation_id = str(payload.get("conversation_id", "default"))
+
+#     # init conversation memory
+#     if conversation_id not in MEMORY:
+#         MEMORY[conversation_id] = {
+#             "turns": 0,
+#             "full_text": "",
+#             "scam_detected": False,
+#             "scam_score": 0.0,
+#             "intel": {
+#                 "upi_ids": [],
+#                 "bank_accounts": [],
+#                 "ifsc_codes": [],
+#                 "phishing_links": [],
+#                 "phone_numbers": [],
+#                 "emails": []
+#             }
+#         }
+
+#     conv = MEMORY[conversation_id]
+
+#     # update text
+#     conv["full_text"] += f"\nSCAMMER: {message}\n"
+
+#     # scam detection score
+#     score = detect_scam(message)
+#     conv["scam_score"] = max(conv["scam_score"], score)
+
+#     # detect scam if score high enough
+#     if conv["scam_score"] >= 0.5:
+#         conv["scam_detected"] = True
+
+#     # extract intelligence from conversation text
+#     extracted = extract_all(conv["full_text"])
+#     for k in conv["intel"]:
+#         conv["intel"][k] = normalize_list(conv["intel"][k] + extracted.get(k, []))
+
+#     # decide behavior
+#     agent_active = conv["scam_detected"]
+#     turns = conv["turns"]
+#     goal = get_goal(conv["intel"])
+
+#     if agent_active:
+#         reply = agent_reply(goal, turns)
+#     else:
+#         reply = "Okay 👍"
+
+#     conv["turns"] += 1
+#     conv["full_text"] += f"HONEYPOT: {reply}\n"
+
+#     return {
+#         "status": "ok",
+#         "conversation_id": conversation_id,
+#         "scam_detected": conv["scam_detected"],
+#         "scam_score": round(conv["scam_score"], 2),
+#         "agent_active": agent_active,
+#         "turns": conv["turns"],
+#         "current_goal": goal,
+#         "reply": reply,
+#         "extracted_intelligence": conv["intel"]
+#     }
+
+
 import os
 import re
-from fastapi import FastAPI, Header, HTTPException, Body
-from typing import Any, Dict, Optional, List
+import time
+import requests
+from fastapi import FastAPI, Header, HTTPException
+from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
 
 app = FastAPI()
+
+# =========================
+# CONFIG
+# =========================
 API_KEY = os.getenv("API_KEY", "gunnu123")
+GUVI_CALLBACK_URL = "https://hackathon.guvi.in/api/updateHoneyPotFinalResult"
 
-# -----------------------------
-# MEMORY (per conversation)
-# -----------------------------
-MEMORY: Dict[str, Dict[str, Any]] = {}
+# How many turns to engage before callback (tune for score)
+MIN_TURNS_BEFORE_CALLBACK = 10
 
-# -----------------------------
-# REGEX EXTRACTORS (strong)
-# -----------------------------
+# =========================
+# INPUT SCHEMA (as per docs)
+# =========================
+class MessageObj(BaseModel):
+    sender: str
+    text: str
+    timestamp: Optional[int] = None
+
+class MetadataObj(BaseModel):
+    channel: Optional[str] = None
+    language: Optional[str] = None
+    locale: Optional[str] = None
+
+class HoneypotRequest(BaseModel):
+    sessionId: str
+    message: MessageObj
+    conversationHistory: Optional[List[MessageObj]] = []
+    metadata: Optional[MetadataObj] = None
+
+# =========================
+# MEMORY
+# =========================
+MEM: Dict[str, Dict[str, Any]] = {}
+
+# =========================
+# REGEX EXTRACTORS
+# =========================
 UPI_REGEX = r"\b[a-zA-Z0-9.\-_]{2,}@[a-zA-Z]{2,}\b"
 BANK_REGEX = r"\b\d{9,18}\b"
 IFSC_REGEX = r"\b[A-Z]{4}0[A-Z0-9]{6}\b"
 URL_REGEX = r"(https?://[^\s]+|www\.[^\s]+)"
-PHONE_REGEX = r"\b[6-9]\d{9}\b"
+PHONE_REGEX = r"\b(?:\+91)?[6-9]\d{9}\b"
 EMAIL_REGEX = r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b"
 
 SCAM_KEYWORDS = [
-    "urgent", "account", "blocked", "otp", "kyc", "verify",
-    "click", "link", "password", "reward", "won", "lottery",
-    "upi", "refund", "offer", "compromised", "sbi", "bank"
+    "urgent", "verify", "verification", "account blocked", "blocked today",
+    "otp", "kyc", "suspend", "suspension", "refund", "prize", "won",
+    "lottery", "reward", "click", "link", "upi", "bank", "immediately",
+    "update now", "password"
 ]
 
-def normalize_list(items: List[str]) -> List[str]:
-    return sorted(list(set([i.strip() for i in items if i and i.strip()])))
+def normalize(items: List[str]) -> List[str]:
+    return sorted(list(set([x.strip() for x in items if x and x.strip()])))
 
-def detect_scam(message: str) -> float:
-    """Return scam score 0 to 1"""
-    msg = (message or "").lower()
-    hits = sum(1 for k in SCAM_KEYWORDS if k in msg)
-    score = min(1.0, hits / 3)  # 3 hits = 1.0
-    return score
+def scam_score(text: str) -> float:
+    t = (text or "").lower()
+    hits = sum(1 for k in SCAM_KEYWORDS if k in t)
+    # 0 hits = 0.0 ; 3 hits+ = 1.0
+    return min(1.0, hits / 3)
 
-def extract_all(text: str) -> Dict[str, List[str]]:
+def extract_intel(all_text: str) -> Dict[str, List[str]]:
     return {
-        "upi_ids": normalize_list(re.findall(UPI_REGEX, text)),
-        "bank_accounts": normalize_list(re.findall(BANK_REGEX, text)),
-        "ifsc_codes": normalize_list(re.findall(IFSC_REGEX, text)),
-        "phishing_links": normalize_list(re.findall(URL_REGEX, text)),
-        "phone_numbers": normalize_list(re.findall(PHONE_REGEX, text)),
-        "emails": normalize_list(re.findall(EMAIL_REGEX, text)),
+        "bankAccounts": normalize(re.findall(BANK_REGEX, all_text)),
+        "upiIds": normalize(re.findall(UPI_REGEX, all_text)),
+        "phishingLinks": normalize(re.findall(URL_REGEX, all_text)),
+        "phoneNumbers": normalize(re.findall(PHONE_REGEX, all_text)),
+        "ifscCodes": normalize(re.findall(IFSC_REGEX, all_text)),
+        "emails": normalize(re.findall(EMAIL_REGEX, all_text)),
     }
 
-def get_goal(intel: Dict[str, List[str]]) -> str:
-    """Decide next best target based on missing intelligence."""
-    if len(intel["phishing_links"]) == 0:
-        return "GET_LINK"
-    if len(intel["upi_ids"]) == 0:
-        return "GET_UPI"
-    if len(intel["bank_accounts"]) == 0:
-        return "GET_BANK"
-    if len(intel["ifsc_codes"]) == 0:
-        return "GET_IFSC"
-    if len(intel["phone_numbers"]) == 0:
-        return "GET_PHONE"
-    return "STALL_MORE"
+def extract_keywords(text: str) -> List[str]:
+    t = (text or "").lower()
+    found = []
+    for k in SCAM_KEYWORDS:
+        if k in t:
+            found.append(k)
+    return normalize(found)
 
-def agent_reply(goal: str, turns: int) -> str:
-    """High-engagement believable replies based on goal."""
+def decide_goal(intel: Dict[str, List[str]]) -> str:
+    # Goal order for max intelligence
+    if len(intel["phishingLinks"]) == 0:
+        return "GET_LINK"
+    if len(intel["upiIds"]) == 0:
+        return "GET_UPI"
+    if len(intel["bankAccounts"]) == 0:
+        return "GET_BANK"
+    if len(intel["ifscCodes"]) == 0:
+        return "GET_IFSC"
+    if len(intel["phoneNumbers"]) == 0:
+        return "GET_PHONE"
+    return "STALL"
+
+def generate_reply(goal: str, turn: int) -> str:
+    # Believable "victim" persona = more engagement + repeated details
     if goal == "GET_LINK":
         return (
-            "Oh no 😥 my SBI account will be blocked?? I’m really scared. "
-            "I tried opening it but it’s not loading on my phone 😭 "
-            "Can you send the official link again? (full link please)"
+            "Oh no 😥 my bank account will be blocked today?? "
+            "I’m really scared. Please explain properly. "
+            "Can you send the official link again? (full link pls)"
         )
-
     if goal == "GET_UPI":
         return (
-            "Okay I got the page now… it is asking for verification/payment 😟 "
-            "I will do it fast. Can you send your UPI ID once? "
-            "I’ll copy paste carefully."
+            "Okay I opened it but it’s asking for verification/payment 😟 "
+            "Can you share the UPI ID once? I’ll copy-paste carefully."
         )
-
     if goal == "GET_BANK":
         return (
             "UPI is failing again 😭 maybe due to limit. "
-            "Can you share bank account number + beneficiary name? "
-            "I’ll try bank transfer quickly."
+            "Can you send account number + beneficiary name? I’ll do bank transfer."
         )
-
     if goal == "GET_IFSC":
         return (
-            "I entered account number, now it’s asking IFSC code. "
-            "Please send IFSC also 🙏"
+            "I entered account number but now it is asking IFSC code. "
+            "Send IFSC please 🙏"
         )
-
     if goal == "GET_PHONE":
         return (
-            "The link is asking customer care contact. "
-            "Can you share your support number? I’ll call once to confirm 😥"
+            "The page is showing customer care option… "
+            "Do you have a support number? I want to confirm quickly 😥"
         )
 
-    # STALL MORE = keep them engaged
-    if turns % 2 == 0:
+    # STALL
+    if turn % 2 == 0:
         return (
-            "Wait wait 😭 the page is stuck again… "
-            "Just confirm this is 100% safe right? "
-            "Send the details once again, I’ll try from my mom’s phone now."
+            "Wait wait 😭 my phone is hanging and network is slow. "
+            "Please resend the details once again clearly. I don’t want mistake."
         )
-    else:
-        return (
-            "Sorry sorry 🙏 my network is slow. "
-            "Please resend the link/UPI details clearly. I don’t want mistake."
-        )
+    return (
+        "Okay… I’m trying again. Just confirm it’s safe right? "
+        "Please stay online 🙏"
+    )
 
-@app.get("/")
-def home():
-    return {"message": "Agentic Honeypot API is live ✅"}
+def should_callback(session: Dict[str, Any]) -> bool:
+    """
+    When to send final result:
+    - scam confirmed
+    - enough turns engaged
+    - some intel extracted
+    """
+    if not session["scamDetected"]:
+        return False
+    if session["totalMessagesExchanged"] < MIN_TURNS_BEFORE_CALLBACK:
+        return False
 
+    intel = session["extractedIntelligence"]
+    # minimum at least 1 item (any)
+    total_intel = (
+        len(intel["bankAccounts"]) +
+        len(intel["upiIds"]) +
+        len(intel["phishingLinks"]) +
+        len(intel["phoneNumbers"])
+    )
+    return total_intel > 0 and not session["callbackSent"]
+
+def send_callback(sessionId: str, session: Dict[str, Any]) -> None:
+    payload = {
+        "sessionId": sessionId,
+        "scamDetected": session["scamDetected"],
+        "totalMessagesExchanged": session["totalMessagesExchanged"],
+        "extractedIntelligence": {
+            "bankAccounts": session["extractedIntelligence"]["bankAccounts"],
+            "upiIds": session["extractedIntelligence"]["upiIds"],
+            "phishingLinks": session["extractedIntelligence"]["phishingLinks"],
+            "phoneNumbers": session["extractedIntelligence"]["phoneNumbers"],
+            "suspiciousKeywords": session["suspiciousKeywords"],
+        },
+        "agentNotes": session["agentNotes"],
+    }
+
+    # Keep callback safe (don’t crash your API)
+    try:
+        requests.post(GUVI_CALLBACK_URL, json=payload, timeout=5)
+        session["callbackSent"] = True
+    except:
+        # ignore errors so your API stays stable
+        pass
+
+# =========================
+# MAIN ENDPOINT
+# =========================
 @app.post("/honeypot")
-async def honeypot(
-    payload: Optional[Any] = Body(default=None),
-    x_api_key: Optional[str] = Header(None)
-):
+def honeypot(req: HoneypotRequest, x_api_key: Optional[str] = Header(None)):
     if x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
-    if payload is None:
-        payload = {}
+    sid = req.sessionId
+    scammer_text = req.message.text
 
-    # parse safely
-    message = ""
-    conversation_id = "default"
-
-    if isinstance(payload, dict):
-        message = str(payload.get("message", ""))
-        conversation_id = str(payload.get("conversation_id", "default"))
-
-    # init conversation memory
-    if conversation_id not in MEMORY:
-        MEMORY[conversation_id] = {
-            "turns": 0,
-            "full_text": "",
-            "scam_detected": False,
-            "scam_score": 0.0,
-            "intel": {
-                "upi_ids": [],
-                "bank_accounts": [],
-                "ifsc_codes": [],
-                "phishing_links": [],
-                "phone_numbers": [],
+    # init session memory
+    if sid not in MEM:
+        MEM[sid] = {
+            "fullText": "",
+            "scamDetected": False,
+            "scamScore": 0.0,
+            "totalMessagesExchanged": 0,
+            "callbackSent": False,
+            "extractedIntelligence": {
+                "bankAccounts": [],
+                "upiIds": [],
+                "phishingLinks": [],
+                "phoneNumbers": [],
+                "ifscCodes": [],
                 "emails": []
-            }
+            },
+            "suspiciousKeywords": [],
+            "agentNotes": ""
         }
 
-    conv = MEMORY[conversation_id]
+    session = MEM[sid]
 
-    # update text
-    conv["full_text"] += f"\nSCAMMER: {message}\n"
+    # build combined text from history + latest message
+    history_text = ""
+    for h in (req.conversationHistory or []):
+        history_text += f"{h.sender.upper()}: {h.text}\n"
 
-    # scam detection score
-    score = detect_scam(message)
-    conv["scam_score"] = max(conv["scam_score"], score)
+    combined = history_text + f"{req.message.sender.upper()}: {scammer_text}\n"
 
-    # detect scam if score high enough
-    if conv["scam_score"] >= 0.5:
-        conv["scam_detected"] = True
+    session["fullText"] += "\n" + combined
+    session["totalMessagesExchanged"] += 1
 
-    # extract intelligence from conversation text
-    extracted = extract_all(conv["full_text"])
-    for k in conv["intel"]:
-        conv["intel"][k] = normalize_list(conv["intel"][k] + extracted.get(k, []))
+    # scam scoring
+    s = scam_score(session["fullText"])
+    session["scamScore"] = max(session["scamScore"], s)
 
-    # decide behavior
-    agent_active = conv["scam_detected"]
-    turns = conv["turns"]
-    goal = get_goal(conv["intel"])
+    if session["scamScore"] >= 0.5:
+        session["scamDetected"] = True
 
-    if agent_active:
-        reply = agent_reply(goal, turns)
+    # extract intelligence
+    intel = extract_intel(session["fullText"])
+    for k in session["extractedIntelligence"]:
+        session["extractedIntelligence"][k] = normalize(
+            session["extractedIntelligence"][k] + intel.get(k, [])
+        )
+
+    # suspicious keywords
+    session["suspiciousKeywords"] = normalize(
+        session["suspiciousKeywords"] + extract_keywords(session["fullText"])
+    )
+
+    # notes (simple summary)
+    session["agentNotes"] = "Scammer used urgency + verification tactics to push victim into payment/link flow."
+
+    # agent reply decision
+    if session["scamDetected"]:
+        goal = decide_goal(session["extractedIntelligence"])
+        reply = generate_reply(goal, session["totalMessagesExchanged"])
     else:
         reply = "Okay 👍"
 
-    conv["turns"] += 1
-    conv["full_text"] += f"HONEYPOT: {reply}\n"
+    # callback if finished enough
+    if should_callback(session):
+        send_callback(sid, session)
 
+    # ✅ REQUIRED OUTPUT FORMAT
     return {
-        "status": "ok",
-        "conversation_id": conversation_id,
-        "scam_detected": conv["scam_detected"],
-        "scam_score": round(conv["scam_score"], 2),
-        "agent_active": agent_active,
-        "turns": conv["turns"],
-        "current_goal": goal,
-        "reply": reply,
-        "extracted_intelligence": conv["intel"]
+        "status": "success",
+        "reply": reply
     }
+
+@app.get("/")
+def home():
+    return {"message": "Agentic Honeypot is live ✅"}
+
 
